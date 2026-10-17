@@ -20,8 +20,8 @@ function need(name) {
 
 // Field -> max characters. Mirrors maxLength in template/index.html; longer text breaks the layout.
 const LIMITS = {
-  label: 28, hook_a: 18, hook_b: 18, hook_accent: 18, list_title: 20,
-  tip1: 34, tip2: 34, tip3: 34, take_a: 20, take_accent: 20,
+  label: 28, hook_a: 24, hook_b: 24, hook_accent: 24, list_title: 26,
+  tip1: 42, tip2: 42, tip3: 42, take_a: 26, take_accent: 26,
 };
 
 function pickTopic() {
@@ -75,27 +75,20 @@ ${feedback}`;
 
 async function texts(topic) {
   let feedback = "";
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
     const t = await writeTexts(topic, feedback);
-    const tooLong = Object.entries(LIMITS).filter(([k, n]) => !t[k] || t[k].length > n);
-    if (!tooLong.length && t.caption.length <= 150) return t;
-    feedback = `Vorheriger Versuch war zu lang oder leer bei: ${tooLong.map(([k]) => k).join(", ")}${t.caption.length > 150 ? ", caption" : ""}. Kürzer formulieren.`;
-    console.log(`Versuch ${attempt}: ${feedback}`);
+    const problems = Object.entries(LIMITS)
+      .filter(([k, n]) => !t[k] || t[k].length > n)
+      .map(([k, n]) => `${k}: "${t[k] ?? ""}" hat ${(t[k] ?? "").length} Zeichen, erlaubt sind ${n}`);
+    if (t.caption.length > 150) problems.push(`caption hat ${t.caption.length} Zeichen, erlaubt sind 150`);
+    if (!problems.length) return t;
+    // Name each offending field with its length so the model can fix exactly those.
+    feedback = `Dein vorheriger Versuch war in diesen Feldern zu lang. Formuliere genau diese Felder kürzer (andere Wörter, nicht abschneiden), alle anderen dürfen gleich bleiben:
+- ${problems.join("
+- ")}`;
+    console.log(`Versuch ${attempt}: ${problems.join(" | ")}`);
   }
   throw new Error("OpenAI hält die Zeichenlimits nicht ein");
-}
-
-// Music and SFX are licensed and not in the public repo; fetch them from the worker when missing.
-const AUDIO = ["music/bgm.mp3", "sfx/stamp.wav", "sfx/slide1.wav", "sfx/slide2.wav", "sfx/pop.wav"];
-for (const rel of AUDIO) {
-  const dest = path.join(templateDir, rel);
-  if (existsSync(dest)) continue;
-  const r = await fetch(`${need("AUTOPOSTER_URL").replace(/\/$/, "")}/api/asset/${rel}`, {
-    headers: { "x-autoposter-secret": need("AUTOPOSTER_SECRET") },
-  });
-  if (!r.ok) throw new Error(`Audio ${rel} nicht ladbar (${r.status})`);
-  mkdirSync(path.dirname(dest), { recursive: true });
-  writeFileSync(dest, Buffer.from(await r.arrayBuffer()));
 }
 
 const topic = pickTopic();
