@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vienna-tiktok-autoposter",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "vienna-tiktok-autoposter", "database_id": "34c30c0b-c1dd-4184-8b28-d171308e3e97" }
+  ],
+  // Videos (~10 MB MP4) live in KV (25 MB value limit) and are deleted once posted or rejected.
+  "kv_namespaces": [
+    { "binding": "VIDEOS", "id": "2881cbe54ddb42c48ab48513b543f930" }
+  ],
+  "vars": {
+    // The TikTok OAuth flow runs on the already approved redirect URI of the main site.
+    "CONNECT_URL": "https://viennawebdesigns.com/api/tiktok/login?target=autoposter"
+  },
+  "observability": { "enabled": true }
+}

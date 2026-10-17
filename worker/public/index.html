@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TikTok Autoposter</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23F59F0A'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@700&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg:#161412; --card:#1F1B19; --surface:#2A2522; --line:#2D2825; --ink:#E8E6E3; --mute:#A39C8F; --amber:#F59F0A; --red:#f87171; --green:#4ade80; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "DM Sans", system-ui, sans-serif; }
+  h1, h2 { font-family: "Syne", sans-serif; letter-spacing: -0.02em; margin: 0; }
+  h1 { font-size: 30px; } h2 { font-size: 20px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 80px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .muted { color: var(--mute); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .grid { display: grid; gap: 16px; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 9px 16px; border-radius: 999px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  button.primary, .btn.primary { background: var(--amber); color: var(--bg); border-color: var(--amber); font-weight: 600; }
+  button.danger:hover { border-color: var(--red); color: var(--red); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  input, select { font: inherit; width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  input:focus, select:focus { outline: none; border-color: var(--amber); }
+  label.f { display: block; font-size: 13px; color: var(--mute); margin-bottom: 4px; }
+  .tog { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; gap: 12px; }
+  .tog input { width: 18px; height: 18px; accent-color: var(--amber); }
+  .tog.off { opacity: .45; }
+  .vid { display: grid; grid-template-columns: 200px 1fr; gap: 20px; }
+  .vid video { width: 200px; aspect-ratio: 9/16; border-radius: 12px; background: #000; display: block; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--mute); white-space: nowrap; }
+  .pill.scheduled { color: var(--amber); border-color: rgba(245,159,10,.4); }
+  .pill.posted { color: var(--green); border-color: rgba(74,222,128,.35); }
+  .pill.failed { color: var(--red); border-color: rgba(248,113,113,.4); }
+  .note { font-size: 13px; color: var(--mute); }
+  .err { color: var(--red); font-size: 14px; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; }
+  .aigc { font-size: 13px; background: rgba(245,159,10,.1); border: 1px solid rgba(245,159,10,.3); color: var(--amber); padding: 6px 10px; border-radius: 10px; }
+  .list { display: grid; gap: 8px; }
+  .item { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; }
+  .item .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  a { color: var(--amber); }
+  [hidden] { display: none !important; }
+  @media (max-width: 640px) { .vid { grid-template-columns: 1fr; } .vid video { width: 100%; max-width: 280px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>TikTok Autoposter</h1><div class="muted">Vienna Webdesigns · KI-Videos prüfen und einplanen</div></div>
+    <div class="row" id="topActions" hidden>
+      <button id="runNow" title="Fällige Posts sofort statt beim nächsten 10-Minuten-Lauf senden">Jetzt ausführen</button>
+      <button id="logout">Abmelden</button>
+    </div>
+  </div>
+
+  <form id="login" class="card" hidden style="max-width:380px">
+    <h2 style="margin-bottom:12px">Anmelden</h2>
+    <label class="f" for="pw">Passwort</label>
+    <input id="pw" type="password" autocomplete="current-password" required />
+    <div class="row" style="margin-top:14px"><button class="primary">Anmelden</button><span id="loginErr" class="err"></span></div>
+  </form>
+
+  <div id="app" class="grid" hidden>
+    <section class="card" id="accountCard"></section>
+    <section class="grid" id="pending"></section>
+    <section class="card"><h2 style="margin-bottom:12px">Eingeplant und gepostet</h2><div class="list" id="history"></div></section>
+  </div>
+</div>
+
+<script>
+const PRIVACY_LABELS = { PUBLIC_TO_EVERYONE: "Alle", MUTUAL_FOLLOW_FRIENDS: "Freunde", FOLLOWER_OF_CREATOR: "Follower", SELF_ONLY: "Nur ich" };
+const STATUS_LABELS = { pending: "Zur Prüfung", scheduled: "Eingeplant", posting: "Wird gesendet", processing: "TikTok verarbeitet", posted: "Gepostet", failed: "Fehlgeschlagen" };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let state = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { credentials: "same-origin", ...opts, headers: { "content-type": "application/json", ...(opts.headers || {}) } });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== "/api/login") { showLogin(); throw new Error("Bitte anmelden"); }
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+function showLogin() { $("#login").hidden = false; $("#app").hidden = true; $("#topActions").hidden = true; }
+
+$("#login").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#loginErr").textContent = "";
+  try { await api("/api/login", { method: "POST", body: JSON.stringify({ password: $("#pw").value }) }); $("#pw").value = ""; load(); }
+  catch (err) { $("#loginErr").textContent = err.message; }
+});
+$("#logout").onclick = async () => { await api("/api/logout", { method: "POST" }); showLogin(); };
+$("#runNow").onclick = async (e) => { e.target.disabled = true; try { await api("/api/run-now", { method: "POST" }); await load(); } catch (err) { alert(err.message); } e.target.disabled = false; };
+
+// Default slot: next full hour at least 30 minutes ahead, in local time for the datetime-local input.
+function defaultSlot() {
+  const d = new Date(Date.now() + 30 * 60e3); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+const fmt = (ms) => new Date(ms).toLocaleString("de-AT", { dateStyle: "medium", timeStyle: "short" });
+
+function renderAccount() {
+  const c = state.creator;
+  const el = $("#accountCard");
+  if (!state.account) {
+    el.innerHTML = `<h2 style="margin-bottom:8px">TikTok verbinden</h2>
+      <p class="muted" style="margin:0 0 14px">Einmal verbinden, danach postet der Autoposter eingeplante Videos selbst. Die Verbindung hält bis zu 1 Jahr.</p>
+      <a class="btn primary" href="${esc(state.connectUrl)}">Mit TikTok verbinden</a>`;
+    return;
+  }
+  el.innerHTML = `<div class="row" style="justify-content:space-between">
+      <div class="row">${c ? `<img class="avatar" src="${esc(c.creator_avatar_url)}" alt="" />` : ""}
+        <div><h2>${c ? esc(c.creator_nickname) : "Verbunden"}</h2>
+        <div class="note">${c ? "@" + esc(c.creator_username) + " · " : ""}Verbindung gültig bis ${fmt(state.account.refresh_expires_at)}</div></div></div>
+      <div class="row"><a class="btn" href="${esc(state.connectUrl)}">Neu verbinden</a><button class="danger" id="disc">Trennen</button></div>
+    </div>${state.creatorError ? `<p class="err">${esc(state.creatorError)}</p>` : ""}`;
+  $("#disc").onclick = async () => { if (!confirm("TikTok trennen? Der Token wird widerrufen und gelöscht, eingeplante Posts werden nicht gesendet.")) return; await api("/api/disconnect", { method: "POST" }); load(); };
+}
+
+function pendingCard(v) {
+  const c = state.creator;
+  const opts = (c?.privacy_level_options || []).map((p) => `<option value="${p}">${PRIVACY_LABELS[p] || p}</option>`).join("");
+  const el = document.createElement("article");
+  el.className = "card vid";
+  el.innerHTML = `
+    <video src="/api/videos/${v.id}/file" controls preload="metadata" playsinline></video>
+    <form class="grid" style="gap:12px">
+      <div class="row" style="justify-content:space-between"><span class="pill ${v.status}">${STATUS_LABELS[v.status] || v.status}</span><span class="note">${esc(v.topic || "")} · ${fmt(v.created_at)}</span></div>
+      ${v.error ? `<p class="err" style="margin:0">${esc(v.error)}</p>` : ""}
+      ${c ? `<div class="row note"><img src="${esc(c.creator_avatar_url)}" style="width:22px;height:22px;border-radius:50%" alt="" />Postet auf <b style="color:var(--ink)">${esc(c.creator_nickname)}</b> @${esc(c.creator_username)}</div>` : `<p class="err" style="margin:0">Erst TikTok verbinden, dann einplanen.</p>`}
+      <div><label class="f">Titel und Hashtags</label><input name="caption" maxlength="2200" value="${esc(v.title || v.caption)}" /></div>
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1;min-width:180px"><label class="f">Wer darf das Video sehen</label>
+          <select name="privacy" required><option value="" selected disabled>Privatsphäre wählen</option>${opts}</select></div>
+        <div style="flex:1;min-width:200px"><label class="f">Veröffentlichen am</label><input name="at" type="datetime-local" value="${defaultSlot()}" required /></div>
+      </div>
+      <div>
+        <div class="note">Nutzern erlauben</div>
+        <label class="tog ${c?.comment_disabled ? "off" : ""}"><span>Kommentieren</span><input type="checkbox" name="comment" ${c?.comment_disabled ? "disabled" : ""} /></label>
+        <label class="tog ${c?.duet_disabled ? "off" : ""}"><span>Duett</span><input type="checkbox" name="duet" ${c?.duet_disabled ? "disabled" : ""} /></label>
+        <label class="tog ${c?.stitch_disabled ? "off" : ""}"><span>Stitch</span><input type="checkbox" name="stitch" ${c?.stitch_disabled ? "disabled" : ""} /></label>
+      </div>
+      <div>
+        <label class="tog"><span>Inhalt offenlegen (bewirbt eine Marke, ein Produkt oder eine Leistung)</span><input type="checkbox" name="disclose" /></label>
+        <div class="disc" hidden style="padding-left:12px;border-left:1px solid var(--line)">
+          <label class="tog"><span>Deine Marke</span><input type="checkbox" name="own" /></label>
+          <label class="tog"><span>Branded Content</span><input type="checkbox" name="branded" /></label>
+          <div class="note discNote"></div>
+        </div>
+      </div>
+      <div class="aigc">Wird auf TikTok als KI-generierter Inhalt gekennzeichnet.</div>
+      <p class="note decl" style="margin:0"></p>
+      <div class="row"><button class="primary" type="submit">Einplanen</button><button class="danger" type="button" data-reject>Verwerfen</button><span class="err msg"></span></div>
+    </form>`;
+
+  const f = el.querySelector("form");
+  const sync = () => {
+    const d = f.disclose.checked;
+    el.querySelector(".disc").hidden = !d;
+    if (!d) { f.own.checked = false; f.branded.checked = false; }
+    // Branded content cannot be private (TikTok commercial content rules).
+    [...f.privacy.options].forEach((o) => { if (o.value === "SELF_ONLY") o.disabled = f.branded.checked; });
+    if (f.branded.checked && f.privacy.value === "SELF_ONLY") f.privacy.value = "";
+    el.querySelector(".discNote").textContent = !d ? "" : !f.own.checked && !f.branded.checked ? "Mindestens eine Option wählen." : f.branded.checked ? 'Das Video wird als "Bezahlte Partnerschaft" gekennzeichnet.' : 'Das Video wird als "Werbeinhalt" gekennzeichnet.';
+    el.querySelector(".decl").innerHTML = f.branded.checked
+      ? 'Mit dem Einplanen stimmst du der <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> und der <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a> von TikTok zu.'
+      : 'Mit dem Einplanen stimmst du der <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a> von TikTok zu.';
+    f.querySelector("[type=submit]").disabled = !c || !f.privacy.value || (d && !f.own.checked && !f.branded.checked);
+  };
+  f.addEventListener("change", sync);
+  sync();
+
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = el.querySelector(".msg"); msg.textContent = "";
+    try {
+      await api(`/api/videos/${v.id}/schedule`, { method: "POST", body: JSON.stringify({
+        title: f.caption.value, privacy_level: f.privacy.value, scheduled_at: new Date(f.at.value).getTime(),
+        allow_comment: f.comment.checked, allow_duet: f.duet.checked, allow_stitch: f.stitch.checked,
+        brand_organic: f.disclose.checked && f.own.checked, brand_content: f.disclose.checked && f.branded.checked,
+      }) });
+      load();
+    } catch (err) { msg.textContent = err.message; }
+  });
+  el.querySelector("[data-reject]").onclick = async () => {
+    if (!confirm("Video verwerfen und löschen?")) return;
+    try { await api(`/api/videos/${v.id}/reject`, { method: "POST" }); load(); } catch (err) { el.querySelector(".msg").textContent = err.message; }
+  };
+  return el;
+}
+
+function renderVideos() {
+  const pend = state.videos.filter((v) => v.status === "pending" || v.status === "failed");
+  const box = $("#pending");
+  box.innerHTML = `<h2>Zur Prüfung (${pend.length})</h2>`;
+  if (!pend.length) box.insertAdjacentHTML("beforeend", `<p class="muted" style="margin:0">Keine neuen Videos. Der Generator legt täglich eins an.</p>`);
+  pend.forEach((v) => box.appendChild(pendingCard(v)));
+
+  const hist = state.videos.filter((v) => !["pending", "failed"].includes(v.status));
+  $("#history").innerHTML = hist.length ? "" : `<p class="muted" style="margin:0">Noch nichts eingeplant.</p>`;
+  hist.forEach((v) => {
+    const row = document.createElement("div");
+    row.className = "item";
+    const when = v.status === "scheduled" ? fmt(v.scheduled_at) : v.scheduled_at ? fmt(v.scheduled_at) : "";
+    row.innerHTML = `<div style="min-width:0"><div class="t">${esc(v.title || v.caption)}</div><div class="note">${when} · ${PRIVACY_LABELS[v.privacy_level] || ""}${v.error ? ` · <span class="err">${esc(v.error)}</span>` : ""}</div></div>
+      <div class="row" style="flex:none"><span class="pill ${v.status}">${STATUS_LABELS[v.status] || v.status}</span>${v.status === "scheduled" ? `<button data-un>Zurückziehen</button>` : ""}</div>`;
+    const un = row.querySelector("[data-un]");
+    if (un) un.onclick = async () => { await api(`/api/videos/${v.id}/unschedule`, { method: "POST" }); load(); };
+    $("#history").appendChild(row);
+  });
+}
+
+async function load() {
+  try { state = await api("/api/state"); } catch { return; }
+  $("#login").hidden = true; $("#app").hidden = false; $("#topActions").hidden = false;
+  renderAccount(); renderVideos();
+}
+load();
+</script>
+</body>
+</html>

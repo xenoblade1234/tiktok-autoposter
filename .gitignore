@@ -1,0 +1,14 @@
+node_modules/
+.wrangler/
+.dev.vars
+generator/out.mp4
+generator/vars.json
+template/renders/
+template/snapshots/
+*.png
+long-test.*
+SECRETS-LOKAL.txt
+
+# Licensed audio, served by the worker (/api/asset/*)
+template/music/
+template/sfx/

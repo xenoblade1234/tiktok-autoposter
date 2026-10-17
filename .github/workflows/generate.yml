@@ -1,0 +1,29 @@
+name: TikTok Video generieren
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # daily 05:00 UTC = 06:00/07:00 Wien
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Thema (leer = automatisch aus topics.json)"
+        required: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: FFmpeg installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Video erzeugen und hochladen
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AUTOPOSTER_URL: ${{ secrets.AUTOPOSTER_URL }}
+          AUTOPOSTER_SECRET: ${{ secrets.AUTOPOSTER_SECRET }}
+          TOPIC: ${{ github.event.inputs.topic }}
+        run: node generator/generate.mjs
