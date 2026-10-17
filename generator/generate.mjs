@@ -32,11 +32,13 @@ function pickTopic() {
 }
 
 async function writeTexts(topic, feedback = "") {
-  const props = Object.fromEntries(Object.entries(LIMITS).map(([k, n]) => [k, { type: "string", maxLength: n }]));
+  // No maxLength in the schema: constrained decoding enforces it by cutting words mid-way ("haltn").
+  // Lengths are checked in texts() instead, with a retry that asks for shorter wording.
+  const props = Object.fromEntries(Object.keys(LIMITS).map((k) => [k, { type: "string" }]));
   props.caption = { type: "string" };
   const prompt = `Du schreibst Texte für ein 15-Sekunden-TikTok von Vienna Webdesigns, einer Webdesign-Agentur in Wien.
 Zielgruppe: kleine Betriebe in Wien. Thema: "${topic}".
-Ton: direkt, freundlich, Du-Form, österreichisches Deutsch, keine Übertreibung.
+Ton: direkt, freundlich, du-Form, österreichisches Deutsch, keine Übertreibung.
 Regeln:
 - Nur allgemein gültige, sachlich richtige Tipps. Keine erfundenen Zahlen, Statistiken, Studien, Preise oder Kundenstimmen.
 - hook_a + hook_b bilden zusammen eine Frage oder Aussage, die neugierig macht. hook_accent ist die kurze Antwort-Ankündigung.
@@ -44,7 +46,8 @@ Regeln:
 - tip1-tip3: je ein konkreter, umsetzbarer Tipp, kein Satzpunkt am Ende.
 - take_a + take_accent: Fazit in zwei Teilen, take_accent endet mit Punkt.
 - label: kurzes Thema in 2-3 Wörtern.
-- Strikte Zeichenlimits (inklusive Leerzeichen): ${JSON.stringify(LIMITS)}.
+- Strikte Zeichenlimits (inklusive Leerzeichen): ${JSON.stringify(LIMITS)}. Lieber kürzer und vollständig als abgeschnitten: jedes Wort ganz ausschreiben, keine Abkürzungen.
+- Rechtschreibung: korrektes Deutsch mit ß (z. B. "regelmäßig"), "du" klein. Fragen enden mit Fragezeichen.
 - caption: TikTok-Beschreibung, 1 Satz plus 3-5 Hashtags (z. B. #webdesign #wien), maximal 150 Zeichen.
 ${feedback}`;
 
@@ -72,7 +75,7 @@ ${feedback}`;
 
 async function texts(topic) {
   let feedback = "";
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 4; attempt++) {
     const t = await writeTexts(topic, feedback);
     const tooLong = Object.entries(LIMITS).filter(([k, n]) => !t[k] || t[k].length > n);
     if (!tooLong.length && t.caption.length <= 150) return t;
