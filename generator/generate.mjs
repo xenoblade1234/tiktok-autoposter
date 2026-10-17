@@ -83,9 +83,7 @@ async function texts(topic) {
     if (t.caption.length > 150) problems.push(`caption hat ${t.caption.length} Zeichen, erlaubt sind 150`);
     if (!problems.length) return t;
     // Name each offending field with its length so the model can fix exactly those.
-    feedback = `Dein vorheriger Versuch war in diesen Feldern zu lang. Formuliere genau diese Felder kürzer (andere Wörter, nicht abschneiden), alle anderen dürfen gleich bleiben:
-- ${problems.join("
-- ")}`;
+    feedback = `Dein vorheriger Versuch war in diesen Feldern zu lang. Formuliere genau diese Felder kürzer (andere Wörter, nicht abschneiden), alle anderen dürfen gleich bleiben:\n- ${problems.join("\n- ")}`;
     console.log(`Versuch ${attempt}: ${problems.join(" | ")}`);
   }
   throw new Error("OpenAI hält die Zeichenlimits nicht ein");
