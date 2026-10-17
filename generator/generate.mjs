@@ -89,6 +89,19 @@ async function texts(topic) {
   throw new Error("OpenAI hält die Zeichenlimits nicht ein");
 }
 
+// Music and SFX are licensed and not in the public repo; fetch them from the worker when missing.
+const AUDIO = ["music/bgm.mp3", "sfx/stamp.wav", "sfx/slide1.wav", "sfx/slide2.wav", "sfx/pop.wav"];
+for (const rel of AUDIO) {
+  const dest = path.join(templateDir, rel);
+  if (existsSync(dest)) continue;
+  const r = await fetch(`${need("AUTOPOSTER_URL").replace(/\/$/, "")}/api/asset/${rel}`, {
+    headers: { "x-autoposter-secret": need("AUTOPOSTER_SECRET") },
+  });
+  if (!r.ok) throw new Error(`Audio ${rel} nicht ladbar (${r.status})`);
+  mkdirSync(path.dirname(dest), { recursive: true });
+  writeFileSync(dest, Buffer.from(await r.arrayBuffer()));
+}
+
 const topic = pickTopic();
 console.log(`Thema: ${topic}`);
 const t = await texts(topic);
